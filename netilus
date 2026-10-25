@@ -19,19 +19,17 @@ if [ "$1" = "help" ]; then
 	exit 0
 fi
 
-if [ "$1" = "up" ]; then
+if [ "$1" = "up" ] || [ "$1" = "down" ]; then
 
-	if [ -z "$2" ];then wrong_use; fi
+	if [ -z "$2" ]; then wrong_use; fi
 
-    if [ ! -z $NETILUS ]; then
-	    up="$(echo "$NETILUS"/lib/up | tr -s "/")"
-    elif [ ! -z "$0" ]; then
-	    up="$(echo $(dirname $(readlink -f $0))/lib/up | tr -s /)"
-    else
-        echo "Error: \$0 doesn't exist :("
-    fi
+    if [ ! -z $NETILUS ]; then cmd="$(echo $NETILUS/lib/$1 | tr -s /)"
 
-	config="$(echo "$(pwd)/$2" | tr -s "/")"
+    elif [ ! -z "$0" ]; then cmd="$(echo $(dirname $(readlink -f $0))/lib/$1 | tr -s /)"
+
+    else echo "Error: \$0 doesn't exist :("; fi
+
+	config=$(readlink -f "$(echo $(pwd)/$2 | tr -s /)")
 	
-	exec "$up" "$config"
+	exec "$cmd" "$config"
 fi
