@@ -1,0 +1,37 @@
+#!/bin/bash
+
+set -eo pipefail
+
+netilus_help(){
+	echo "Use: netilus <command> <argument>:"
+	echo "     netilus {up | down | test } <topology file>"
+	echo "     netilus shell <device>"
+	echo "     netilus status"
+}
+
+wrong_use(){
+	echo "Wrong use, try netilus help"
+	exit 1
+}
+
+if [ "$1" = "help" ]; then
+	netilus_help
+	exit 0
+fi
+
+if [ "$1" = "up" ]; then
+
+	if [ -z "$2" ];then wrong_use; fi
+
+    if [ ! -z $NETILUS ]; then
+	    up="$(echo "$NETILUS"/lib/up | tr -s "/")"
+    elif [ ! -z "$0" ]; then
+	    up="$(echo $(dirname $(readlink -f $0))/lib/up | tr -s /)"
+    else
+        echo "Error: \$0 doesn't exist :("
+    fi
+
+	config="$(echo "$(pwd)/$2" | tr -s "/")"
+	
+	exec "$up" "$config"
+fi

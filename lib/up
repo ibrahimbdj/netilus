@@ -1,0 +1,43 @@
+#!/bin/bash
+
+set -eo pipefail
+
+veth_name_gen(){
+    local i=0
+
+    while ip netns exec "$1" ip link | grep "v${1}-${2}-$i"; do
+        i=$(expr i + 1)
+    done
+
+    echo "v${1}-${2}-$i"
+
+}
+
+peer(){
+    if [ ! -e "/var/run/netns/$1" ]; then
+        ip netns add "$1"
+    fi
+
+    if [ ! -e "/var/run/netns/$2" ]; then
+        ip netns add "$2"
+    fi
+
+    declare -A veth=(["$1"]="$(veth_name_gen $1 $2)" ["$2"]="$(veth_name_gen $2 $1)")
+
+    ip link add ${veth["$1"]} type veth peer name ${veth["$2"]}
+
+    for ns in "$1" "$2"; do
+        ip link set ${veth["$ns"]} netns "$ns"
+        ip netns exec "$ns" ip link set ${veth["$ns"]} up
+        ip netns exec "$ns" ip link set lo up
+    done
+
+    ip netns exec "$1" ip addr add 10.0.0.1/24 dev ${veth["$1"]}
+    ip netns exec "$2" ip addr add 10.0.0.2/24 dev ${veth["$2"]}
+}
+
+while read -r line; do
+    $line
+done < "$1"
+
+$line

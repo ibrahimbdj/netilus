@@ -1,0 +1,25 @@
+#!/bin/bash
+
+set -eo pipefail
+
+veth_name_gen(){
+    local i=0
+
+    while ip netns exec "$1" ip link | grep "v${1}-${2}-$i"; do
+        i=$(expr i + 1)
+    done
+
+    echo "v${1}-${2}-$i"
+
+}
+
+peer(){
+    ip netns delete "$1"
+    ip netns delete "$2"
+}
+
+while read -r line; do
+    $line
+done < "$1"
+
+$line
