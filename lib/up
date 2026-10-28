@@ -2,6 +2,48 @@
 
 set -o pipefail
 
+shift_ip(){
+    if [ "$2" = "fnext" ]; then
+        local a="${3#*.}"
+        local b="${a#*.}"
+        a="${a%.*}"
+
+        if [ "$b" = "255" ]; then
+            if [ "$a" = "255" ]; then
+                echo "Mate you won ! You reached the limit of available subnet in my little and poor utility"
+                exit 1
+            else
+                a=$(expr $a + 1)
+                b="0"
+            fi
+        else
+            b=$(expr $b + 1)
+        fi
+
+        new_ip_range="10.${a}.${b}"
+
+        sed -i "s/fnext:.*/fnext:${new_ip_range}/" "$1"
+
+    elif [ "$2" = "next" ]; then
+        sed -i "/next:$3/d" "$1"
+    else
+        echo "Mate check your network config file >:("
+    fi
+}
+
+ip_gen(){
+    ip_line="$(grep "next:.*" "$4"| tail -1)"
+
+    ip_range="${ip_line#*:}"
+
+    if [ "$3" = "peer" ]; then
+        ip1="${ip_range}.1"
+        ip2="${ip_range}.2"
+    fi
+
+    shift_ip "$4" "${ip_line%:*}" "$ip_range"
+}
+
 veth_name_gen(){
     local i=0
 
@@ -13,6 +55,18 @@ veth_name_gen(){
 }
 
 peer(){
+    if [ ${#1} -gt 5 ] || [ ${#2} -gt 5 ]; then
+        echo "For now, the maximum length for device names is 5 char, it will be increased"
+        exit 1
+    fi
+
+    if [ "$1" = "$2" ]; then
+        echo "Please dont use the same device names"
+        exit 1
+    fi
+
+    ip_gen "$@"
+
     if [ ! -e "/var/run/netns/$1" ]; then
         ip netns add "$1"
     fi
@@ -31,12 +85,18 @@ peer(){
         ip netns exec "$ns" ip link set lo up
     done
 
-    ip netns exec "$1" ip addr add 10.0.0.1/24 dev ${veth["$1"]}
-    ip netns exec "$2" ip addr add 10.0.0.2/24 dev ${veth["$2"]}
+    ip netns exec "$1" ip addr add "$ip1"/24 dev ${veth["$1"]}
+    ip netns exec "$2" ip addr add "$ip2"/24 dev ${veth["$2"]}
 }
 
+declare -A cmd=(["peer"]="peer")
+
 while read -r line; do
-    $line
+    if [ ! -z "${cmd[${line%% *}]}" ]; then
+        $line "${line%% *}" "${0%/*/*}/config/network.cfg"
+    fi
 done < "$1"
 
-$line
+if [ ! -z "${cmd[${line%% *}]}" ]; then
+    $line "${line%% *}" "${0%/*/*}/config/network.cfg"
+fi
