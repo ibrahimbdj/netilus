@@ -1,10 +1,12 @@
 #!/bin/bash
 
-set -o pipefail
+set -eo pipefail
 
 shift_ip(){
-    if [ "$2" = "fnext" ]; then
-        local a="${3#*.}"
+    local ip="${2#*:}"
+
+    if [ "${2%:*}" = "fnext" ]; then
+        local a="${ip#*.}"
         local b="${a#*.}"
         a="${a%.*}"
 
@@ -13,45 +15,47 @@ shift_ip(){
                 echo "Mate you won ! You reached the limit of available subnet in my little and poor utility"
                 exit 1
             else
-                a=$(expr $a + 1)
+                a=$((a + 1))
                 b="0"
             fi
         else
-            b=$(expr $b + 1)
+            b=$((b + 1))
         fi
 
-        new_ip_range="10.${a}.${b}"
+        local new_ip_range="10.${a}.${b}"
 
         sed -i "s/fnext:.*/fnext:${new_ip_range}/" "$1"
 
-    elif [ "$2" = "next" ]; then
-        sed -i "/next:$3/d" "$1"
+    elif [ "${2%:*}" = "next" ]; then
+        sed -i "/next:${ip}[[:space:]]*$/d" "$1"
     else
         echo "Mate check your network config file >:("
     fi
 }
 
 ip_gen(){
-    ip_line="$(grep "next:.*" "$4"| tail -1)"
+    local ip_line="$(tail -1 "$1")"
 
-    ip_range="${ip_line#*:}"
+    local ip_range="${ip_line#*:}"
 
-    if [ "$3" = "peer" ]; then
-        ip1="${ip_range}.1"
-        ip2="${ip_range}.2"
-    fi
+    local i="$2"
 
-    shift_ip "$4" "${ip_line%:*}" "$ip_range"
+    while [ "$i" -gt "0" ]; do
+        eval ip${i}="${ip_range%% *}.$i"
+        i=$((i - 1))
+    done
+
+    shift_ip "$1" "$ip_line"
 }
 
 veth_name_gen(){
     local i=0
 
-    while ip netns exec "$1" ip link | grep -q "v${1}-${2}-$i"; do
-        i=$(expr $i + 1)
+    while ip -n "$1" link show "${3:0:1}${1}-${2}-${i}" >/dev/null 2>&1; do
+        i=$((i + 1))
     done
 
-    echo "v${1}-${2}-$i"
+    veth_name="${3:0:1}${1}-${2}-${i}"
 }
 
 peer(){
@@ -65,8 +69,6 @@ peer(){
         exit 1
     fi
 
-    ip_gen "$@"
-
     if [ ! -e "/var/run/netns/$1" ]; then
         ip netns add "$1"
     fi
@@ -75,28 +77,39 @@ peer(){
         ip netns add "$2"
     fi
 
-    declare -A veth=(["$1"]="$(veth_name_gen $1 $2)" ["$2"]="$(veth_name_gen $2 $1)")
+    veth_name_gen "$1" "$2" "peer"
+    veth1=$veth_name
+    veth2="b${2}-${1}-${veth1##*-}"
 
-    ip link add ${veth["$1"]} type veth peer name ${veth["$2"]}
+    local -A veth=(["$1"]="$veth1" ["$2"]="$veth2")
 
+    ip link add "${veth["$1"]}" netns "$1" type veth peer name "${veth["$2"]}" netns "$2"
+    
     for ns in "$1" "$2"; do
-        ip link set ${veth["$ns"]} netns "$ns"
-        ip netns exec "$ns" ip link set ${veth["$ns"]} up
-        ip netns exec "$ns" ip link set lo up
+        ip -n "$ns" link set ${veth["$ns"]} up
+        ip -n "$ns" link set lo up
     done
 
-    ip netns exec "$1" ip addr add "$ip1"/24 dev ${veth["$1"]}
-    ip netns exec "$2" ip addr add "$ip2"/24 dev ${veth["$2"]}
+    ip_gen "$3" "2"
+
+    ip -n "$1" addr add "$ip1"/24 dev ${veth["$1"]}
+    ip -n "$2" addr add "$ip2"/24 dev ${veth["$2"]}
 }
 
-declare -A cmd=(["peer"]="peer")
+bridge(){
+    echo "not implemented yet"
+}
+
+declare -A cmd=(["peer"]="peer" ["bridge"]="bridge")
+
+network_conf="${0%/*/*}/config/network.cfg"
 
 while read -r line; do
     if [ ! -z "${cmd[${line%% *}]}" ]; then
-        $line "${line%% *}" "${0%/*/*}/config/network.cfg"
+        $line "$network_conf"
     fi
 done < "$1"
 
 if [ ! -z "${cmd[${line%% *}]}" ]; then
-    $line "${line%% *}" "${0%/*/*}/config/network.cfg"
+    $line $network_conf
 fi
