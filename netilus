@@ -39,5 +39,12 @@ if [ "$1" = "up" ] || [ "$1" = "down" ]; then
 		config=$(readlink -f "$(echo $(pwd)/$2 | tr -s /)")
 	fi
 
+	if [ ! -e "$config" ]; then
+		echo "Topology file not found"
+		exit 1
+	fi
+
 	exec "$cmd" "$config"
 fi
+
+wrong_use
