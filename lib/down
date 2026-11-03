@@ -13,23 +13,25 @@ peer(){
 }
 
 bridge(){
-    local i=0
+    if [ -e "/var/run/netns/$1" ]; then
+        ip netns delete "$1"
+    fi
 
-    while [ $i -lt "$2" ]; do
-        i=$((i + 1))
-        ip netns delete "$1$i"
-    done
-
-    ip link delete "$1"
+    if [ -e "/var/run/netns/$2" ]; then
+        ip netns delete "$2"
+    fi
 }
 
 declare -A cmd=(["peer"]="peer" ["bridge"]="bridge")
 
-while read -r line; do
-    if [ ! -z "$line" ] && [ ! -z "${cmd[${line%% *}]}" ]; then
-        $line
-    fi
-done < "$1"
+{
+    read -r next_subnet
+    while read -r line; do
+        if [ ! -z "$line" ] && [ ! -z "${cmd[${line%% *}]}" ]; then
+            $line
+        fi
+    done
+} < "$1"
 
 if [ ! -z "$line" ] && [ ! -z "${cmd[${line%% *}]}" ]; then
     $line

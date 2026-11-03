@@ -30,7 +30,8 @@ if [ "$1" = "up" ] || [ "$1" = "down" ]; then
     elif [ ! -z "$0" ]; then 
 		cmd="$(echo $(dirname $(readlink -f $0))/lib/$1 | tr -s /)"
     else 
-		echo "Error: \$0 doesn't exist :("
+		echo "Error: $0 not found :("
+		exit 1
 	fi
 
 	if [ "${2:0:1}" = "/" ]; then

@@ -23,31 +23,29 @@ shift_ip(){
 }
 
 ip_gen(){
-   local i="$1"
+   local i=0
 
-    while [ "$i" -gt "0" ]; do
-        eval ip${i}="${next_subnet}.$i"
-        i=$((i - 1))
-    done
-
-    shift_ip
-}
-
-veth_name_gen(){
-    local i=0
-
-    while ip -n "$1" link show "${1}-${2}-${i}" >/dev/null 2>&1; do
+    while [ "$i" -lt "$2" ]; do
         i=$((i + 1))
-    done
+        ip_followup[$1]=$((ip_followup[$1] + 1))
 
-    veth_name="${1}-${2}-${i}"
+        if [ ${ip_followup[$1]} -gt 254 ]; then
+            echo "Limit of ip reached in subnet ${1}.0/24"
+            exit 1
+        fi
+
+        ip_tab[i]="${1}.${ip_followup[$1]}"
+    done
 }
 
-valid_name(){
-    local c='[a-zA-Z0-9_-]'
+check_name(){
+    local c='[a-zA-Z0-9]'
+    local d=$c$c
+    local e=$d$d
+    local f=$e$e
 
     case "$1" in
-        $c | $c$c | $c$c$c | $c$c$c$c | $c$c$c$c$c);;
+        $c | $d | $d$c | $e | $e$c | $e$d | $e$d$c | $f | $f$c | $f$d |$f$d$c | $f$e);;
         *)
         echo "Invalid name: $1"
         exit 1
@@ -55,19 +53,37 @@ valid_name(){
     esac
 }
 
-peer(){
-    if [ ${#1} -gt 5 ] || [ ${#2} -gt 5 ]; then
-        echo "For now, the maximum length for device names is 5 char, it will be increased"
+veth_gen(){
+    if [ ${#1} -gt 12 ] || [ ${#2} -gt 12 ]; then
+        echo "Error: maximum object name is 12 !"
         exit 1
     fi
+
+    local i=0
+
+    while ip -n "$1" link show "${2}-${i}" >/dev/null 2>&1; do
+        i=$((i + 1))
+    done
+
+    veth1="${2}-${i}"
+    veth2="${1}-${i}"
+
+    if [ ${#veth1} -gt 15 ] || [ ${#veth2} -gt 15 ]; then
+        echo "Error: Maximum veth name length reached, format: <object1_name>-<nth veth to the ns>"
+        exit 1
+    fi
+
+    ip link add "$veth1" netns "$1" type veth peer name "$veth2" netns "$2"
+}
+
+check_ns(){
+    check_name "$1"
+    check_name "$2"
 
     if [ "$1" = "$2" ]; then
-        echo "Please dont use the same device names"
+        echo "Peer error: please dont use the same args"
         exit 1
     fi
-
-    valid_name "$1"
-    valid_name "$2"
 
     if [ ! -e "/var/run/netns/$1" ]; then
         ip netns add "$1"
@@ -76,64 +92,87 @@ peer(){
     if [ ! -e "/var/run/netns/$2" ]; then
         ip netns add "$2"
     fi
+}
 
-    veth_name_gen "$1" "$2" "peer"
-    local veth1=$veth_name
-    local veth2="${2}-${1}-${veth1##*-}"
+toHost(){
+    ip -n "$1" link set "$2" up
+    ip -n "$1" addr add "$3"/24 dev "$2"
+    ip -n "$1" link set lo up
+}
 
-    ip_gen "2"
+toBridge(){
+    if ! ip -n "$1" link show "$1" >/dev/null 2>&1; then
+        ip -n "$1" link add "$1" type bridge
+        ip -n "$1" link set "$1" up
+    fi
 
-    ip link add "$veth1" netns "$1" type veth peer name "$veth2" netns "$2"
-    
-    ip -n "$1" link set "$veth1" up
-    ip -n "$1" addr add "$ip1"/24 dev "$veth1"
+    ip -n "$1" link set "$2" up
     ip -n "$1" link set lo up
 
-    ip -n "$2" link set "$veth2" up
-    ip -n "$2" addr add "$ip2"/24 dev "$veth2"
-    ip -n "$2" link set lo up
+    ip -n "$1" link set "$2" master "$1"
+}
+
+peer(){
+    check_ns "$1" "$2"
+
+    ip_gen "$next_subnet" "2"
+    shift_ip
+
+    veth_gen "$1" "$2"
+
+    toHost "$1" "$veth1" "${ip_tab[1]}"
+    toHost "$2" "$veth2" "${ip_tab[2]}"
 }
 
 bridge(){
-    if [ ${#1} -gt 6 ]; then
-        echo "Bridge name too long"
-        exit 1
-    fi
 
-    if [ ip link show "$1" 2> /dev/null ]; then
-        echo "Bridge \"${1}\" already exist"
-        exit 1
-    fi
+    check_ns "$1" "$2"
+    veth_gen "$1" "$2"
 
-    ip link add "$1" type bridge
-    ip link set "$1" up
+    case "$3" in
+        "-b")
+            if [ "${bridge_ip[$1]}" = "${bridge_ip[$2]}" ]; then
+                if [ -z "${bridge_ip[$1]}" ]; then
+                    bridge_ip[$1]="$next_subnet"
+                    bridge_ip[$2]="$next_subnet"
+                    shift_ip
+                fi
+            elif [ -z "${brige_ip[$1]}" ]; then
+                bridge_ip[$1]="${bridge_ip[$2]}"
+            elif  [ -z "${brige_ip[$2]}" ]; then
+                bridge_ip[$2]="${bridge_ip[$1]}"
+            else
+                echo "If you want link 2 bridge, you need to be in those case:"
+                echo "1) Only one of the two bridges already exist"
+                echo "2) The two bridge does not exist yet"
 
-    valid_name "$1"
+                exit 1
+            fi
 
-    ip_gen "$2"
+            toBridge "$2" "$veth2"
+        ;;
+        *)
+            if [ -z "${bridge_ip[$1]}" ]; then
+                bridge_ip[$1]="$next_subnet"
+                shift_ip
+            fi
 
-    local i="$2"
-    while [ $i -gt 0 ]; do
-        ip netns add "$1$i"
+            ip_gen "${bridge_ip[$1]}" "1"
+            toHost "$2" "$veth2" "${ip_tab[1]}"
+        ;;
+    esac
 
-        local veth1="${1}-${1}${i}"
-        local veth2="${1}${i}-${1}"
-
-        ip link add "$veth1" type veth peer name "$veth2" netns "$1$i"
-        ip link set "$veth1" up
-        ip -n "$1$i" link set "$veth2" up
-        ip -n "$1$i" link set lo up
-        eval ip -n "$1$i" addr add "\$ip${i}/24" dev "$veth2"
-        ip link set "$veth1" master "$1"
-
-        i=$((i - 1))
-    done
+    toBridge "$1" "$veth1"
 }
 
 declare -A cmd=(["peer"]="peer" ["bridge"]="bridge")
+declare -A bridge_ip
+declare -A ip_followup
+declare -a ip_tab
 
 {
     read -r next_subnet
+    ip_followup=(["$next_subnet"]="0")
     while read -r line; do
         if [ ! -z "$line" ] && [ ! -z "${cmd[${line%% *}]}" ]; then
             $line
