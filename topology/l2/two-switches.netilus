@@ -1,0 +1,8 @@
+10.0.0
+# One LAN spread over two linked switches
+# The switches are linked first so they share the same subnet
+bridge sw1 sw2 -b
+bridge sw1 h1
+bridge sw1 h2
+bridge sw2 h3
+bridge sw2 h4

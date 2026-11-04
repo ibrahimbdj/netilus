@@ -1,0 +1,8 @@
+10.0.0
+# Full mesh of four hosts: every pair has its own cable and subnet
+peer h1 h2
+peer h1 h3
+peer h1 h4
+peer h2 h3
+peer h2 h4
+peer h3 h4

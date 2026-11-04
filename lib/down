@@ -22,7 +22,17 @@ bridge(){
     fi
 }
 
-declare -A cmd=(["peer"]="peer" ["bridge"]="bridge")
+router(){
+    if [ -e "/var/run/netns/$1" ]; then
+        ip netns delete "$1"
+    fi
+
+    if [ -e "/var/run/netns/$2" ]; then
+        ip netns delete "$2"
+    fi
+}
+
+declare -A cmd=(["peer"]="peer" ["bridge"]="bridge" ["router"]="router")
 
 {
     read -r next_subnet

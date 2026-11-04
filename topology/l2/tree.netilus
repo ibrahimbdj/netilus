@@ -1,0 +1,9 @@
+10.0.0
+# Hierarchical LAN: one core switch, two access switches, two hosts each
+# Switch links come first so the whole tree shares one subnet
+bridge core acc1 -b
+bridge core acc2 -b
+bridge acc1 h1
+bridge acc1 h2
+bridge acc2 h3
+bridge acc2 h4

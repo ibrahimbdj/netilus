@@ -1,0 +1,3 @@
+10.0.0
+# Two hosts linked by a single cable
+peer h1 h2

@@ -1,0 +1,6 @@
+10.0.0
+# One switch with four hosts: a single LAN, one subnet
+bridge sw1 h1
+bridge sw1 h2
+bridge sw1 h3
+bridge sw1 h4

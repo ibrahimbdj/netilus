@@ -1,6 +1,14 @@
 #!/bin/bash
 
 set -eo pipefail
+trap exit1 EXIT
+
+exit1(){
+    if [ "$?" -ne 0 ]; then
+        echo "up failed, topology cleaning" >&2
+        "${0%/*}/down" $topology
+    fi
+}
 
 shift_ip(){
     local a="${next_subnet#*.}"
@@ -9,7 +17,7 @@ shift_ip(){
 
     if [ "$b" = "255" ]; then
         if [ "$a" = "255" ]; then
-            echo "Mate you won ! You reached the limit of available next_subnet in my little and poor utility"
+            echo "You reached the limit of available next_subnet in my little and poor utility" >&2
             exit 1
         else
             a=$((a + 1))
@@ -30,7 +38,7 @@ ip_gen(){
         ip_followup[$1]=$((ip_followup[$1] + 1))
 
         if [ ${ip_followup[$1]} -gt 254 ]; then
-            echo "Limit of ip reached in subnet ${1}.0/24"
+            echo "Limit of ip reached in subnet ${1}.0/24" >&2
             exit 1
         fi
 
@@ -47,7 +55,7 @@ check_name(){
     case "$1" in
         $c | $d | $d$c | $e | $e$c | $e$d | $e$d$c | $f | $f$c | $f$d |$f$d$c | $f$e);;
         *)
-        echo "Invalid name: $1"
+        echo "Invalid name: $1" >&2
         exit 1
         ;;
     esac
@@ -55,7 +63,7 @@ check_name(){
 
 veth_gen(){
     if [ ${#1} -gt 12 ] || [ ${#2} -gt 12 ]; then
-        echo "Error: maximum object name is 12 !"
+        echo "Error: maximum object name is 12 !" >&2
         exit 1
     fi
 
@@ -69,7 +77,7 @@ veth_gen(){
     veth2="${1}-${i}"
 
     if [ ${#veth1} -gt 15 ] || [ ${#veth2} -gt 15 ]; then
-        echo "Error: Maximum veth name length reached, format: <object1_name>-<nth veth to the ns>"
+        echo "Error: Maximum veth name length reached" >&2
         exit 1
     fi
 
@@ -81,7 +89,7 @@ check_ns(){
     check_name "$2"
 
     if [ "$1" = "$2" ]; then
-        echo "Peer error: please dont use the same args"
+        echo "Peer error: please dont use the same args" >&2
         exit 1
     fi
 
@@ -137,14 +145,14 @@ bridge(){
                     bridge_ip[$2]="$next_subnet"
                     shift_ip
                 fi
-            elif [ -z "${brige_ip[$1]}" ]; then
+            elif [ -z "${bridge_ip[$1]}" ]; then
                 bridge_ip[$1]="${bridge_ip[$2]}"
-            elif  [ -z "${brige_ip[$2]}" ]; then
+            elif  [ -z "${bridge_ip[$2]}" ]; then
                 bridge_ip[$2]="${bridge_ip[$1]}"
             else
-                echo "If you want link 2 bridge, you need to be in those case:"
-                echo "1) Only one of the two bridges already exist"
-                echo "2) The two bridge does not exist yet"
+                echo "If you want link 2 bridge, you need to be in those case:" >&2
+                echo "1) Only one of the two bridges already exist" >&2
+                echo "2) The two bridge does not exist yet" >&2
 
                 exit 1
             fi
@@ -165,10 +173,12 @@ bridge(){
     toBridge "$1" "$veth1"
 }
 
-declare -A cmd=(["peer"]="peer" ["bridge"]="bridge")
+declare -A cmd=(["peer"]="peer" ["bridge"]="bridge" ["router"]="router")
 declare -A bridge_ip
 declare -A ip_followup
 declare -a ip_tab
+
+topology="$1"
 
 {
     read -r next_subnet
@@ -178,7 +188,7 @@ declare -a ip_tab
             $line
         fi
     done
-} < "$1"
+} < "$topology"
 
 if [ ! -z "$line" ] && [ ! -z "${cmd[${line%% *}]}" ]; then
     $line

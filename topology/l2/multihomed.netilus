@@ -1,0 +1,8 @@
+10.0.0
+# Two separate LANs and one host (gw) plugged into both
+bridge lan1 h1
+bridge lan1 h2
+bridge lan2 h3
+bridge lan2 h4
+bridge lan1 gw
+bridge lan2 gw

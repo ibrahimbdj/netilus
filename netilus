@@ -3,14 +3,23 @@
 set -eo pipefail
 
 netilus_help(){
-	echo "Use: netilus <command> <argument>:"
-	echo "     netilus {up | down | test } <topology file>"
-	echo "     netilus shell <device>"
-	echo "     netilus status"
+	echo "Command use:"
+	echo "  netilus <command> <argument>:"
+	echo "  netilus {up | down} <topology file>"
+	echo "  netilus shell <device>"
+	echo "  netilus status"
+	echo ""
+	echo "Topology file syntax:"
+	echo "  peer a b -> link host a to host b"
+	echo "  bridge a b -> plug host b into switch a"
+	echo "  bridge a b -b -> link switch a to switch b"
+	echo "  router a b -> link router a to host b"
+	echo "  router a b -b -> link router a to switch b"
+	echo "  router a b -r -> link router a to router b"
 }
 
 wrong_use(){
-	echo "Wrong use, try netilus help"
+	echo "Wrong use, try netilus help" >&2
 	exit 1
 }
 
@@ -30,7 +39,7 @@ if [ "$1" = "up" ] || [ "$1" = "down" ]; then
     elif [ ! -z "$0" ]; then 
 		cmd="$(echo $(dirname $(readlink -f $0))/lib/$1 | tr -s /)"
     else 
-		echo "Error: $0 not found :("
+		echo "Error: $0 not found :(" >&2
 		exit 1
 	fi
 
@@ -41,7 +50,7 @@ if [ "$1" = "up" ] || [ "$1" = "down" ]; then
 	fi
 
 	if [ ! -e "$config" ]; then
-		echo "Topology file not found"
+		echo "Topology file not found" >&2
 		exit 1
 	fi
 

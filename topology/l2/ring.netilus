@@ -1,0 +1,7 @@
+10.0.0
+# Ring of hosts, each cable is its own subnet
+# Without routing, a host only reaches its two neighbours
+peer h1 h2
+peer h2 h3
+peer h3 h4
+peer h4 h1

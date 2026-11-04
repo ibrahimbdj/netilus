@@ -1,0 +1,4 @@
+10.0.0
+# Two hosts linked by two cables, each cable in its own subnet
+peer h1 h2
+peer h1 h2
