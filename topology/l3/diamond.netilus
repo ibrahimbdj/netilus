@@ -1,0 +1,10 @@
+10.0.0
+# Two LANs connected by two equal-length paths (r1-r2-r4 and r1-r3-r4)
+bridge lan1 h1
+bridge lan2 h2
+router r1 lan1 -b
+router r4 lan2 -b
+router r1 r2 -r
+router r1 r3 -r
+router r2 r4 -r
+router r3 r4 -r

@@ -1,0 +1,11 @@
+10.0.0
+# One router joining three LANs
+bridge lan1 h1
+bridge lan1 h2
+bridge lan2 h3
+bridge lan2 h4
+bridge lan3 h5
+bridge lan3 h6
+router core lan1 -b
+router core lan2 -b
+router core lan3 -b

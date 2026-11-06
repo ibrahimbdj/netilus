@@ -1,0 +1,6 @@
+10.0.0
+# A host at each end of a chain of three routers
+router r1 h1
+router r1 r2 -r
+router r2 r3 -r
+router r3 h2

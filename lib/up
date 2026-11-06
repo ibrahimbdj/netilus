@@ -69,7 +69,7 @@ veth_gen(){
 
     local i=0
 
-    while ip -n "$1" link show "${2}-${i}" >/dev/null 2>&1; do
+    while ip -n "$1" link show dev "${2}-${i}" >/dev/null 2>&1; do
         i=$((i + 1))
     done
 
@@ -81,7 +81,7 @@ veth_gen(){
         exit 1
     fi
 
-    ip link add "$veth1" netns "$1" type veth peer name "$veth2" netns "$2"
+    ip link add dev "$veth1" netns "$1" type veth peer name "$veth2" netns "$2"
 }
 
 check_ns(){
@@ -103,21 +103,21 @@ check_ns(){
 }
 
 toHost(){
-    ip -n "$1" link set "$2" up
+    ip -n "$1" link set dev "$2" up
     ip -n "$1" addr add "$3"/24 dev "$2"
-    ip -n "$1" link set lo up
+    ip -n "$1" link set dev lo up
 }
 
 toBridge(){
     if ! ip -n "$1" link show "$1" >/dev/null 2>&1; then
-        ip -n "$1" link add "$1" type bridge
-        ip -n "$1" link set "$1" up
+        ip -n "$1" link add dev "$1" type bridge stp_state 1 forward_delay 200
+        ip -n "$1" link set dev "$1" up
     fi
 
-    ip -n "$1" link set "$2" up
-    ip -n "$1" link set lo up
+    ip -n "$1" link set dev "$2" up
+    ip -n "$1" link set dev lo up
 
-    ip -n "$1" link set "$2" master "$1"
+    ip -n "$1" link set dev "$2" master "$1"
 }
 
 peer(){
@@ -133,7 +133,6 @@ peer(){
 }
 
 bridge(){
-
     check_ns "$1" "$2"
     veth_gen "$1" "$2"
 
@@ -150,7 +149,7 @@ bridge(){
             elif  [ -z "${bridge_ip[$2]}" ]; then
                 bridge_ip[$2]="${bridge_ip[$1]}"
             else
-                echo "If you want link 2 bridge, you need to be in those case:" >&2
+                echo "If you want link 2 bridge in the same lan, you need to be in those case:" >&2
                 echo "1) Only one of the two bridges already exist" >&2
                 echo "2) The two bridge does not exist yet" >&2
 
@@ -173,7 +172,25 @@ bridge(){
     toBridge "$1" "$veth1"
 }
 
+router(){
+    check_ns "$1" "$2"
+    veth_gen "$1" "$2"
+
+    case "$3" in
+        "-b")
+            bridge "$2" "$1"
+        ;;
+        "-r")
+            peer "$1" "$2"
+            router_list[$2]="$2"
+        ;;
+    esac
+
+    router_list[$1]="$1"
+}
+
 declare -A cmd=(["peer"]="peer" ["bridge"]="bridge" ["router"]="router")
+declare -A router_list
 declare -A bridge_ip
 declare -A ip_followup
 declare -a ip_tab
@@ -193,3 +210,5 @@ topology="$1"
 if [ ! -z "$line" ] && [ ! -z "${cmd[${line%% *}]}" ]; then
     $line
 fi
+
+"${0%/*}"/routing ${router_list[@]}

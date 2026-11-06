@@ -1,0 +1,14 @@
+10.0.0
+# Headquarters router with its LAN, and three branch offices linked to it
+bridge hqlan h1
+bridge hqlan h2
+router hq hqlan -b
+bridge lan1 h3
+bridge lan2 h4
+bridge lan3 h5
+router branch1 lan1 -b
+router branch2 lan2 -b
+router branch3 lan3 -b
+router hq branch1 -r
+router hq branch2 -r
+router hq branch3 -r

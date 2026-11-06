@@ -1,0 +1,11 @@
+10.0.0
+# Three routers in a ring, each with its own LAN
+bridge lan1 h1
+bridge lan2 h2
+bridge lan3 h3
+router r1 lan1 -b
+router r2 lan2 -b
+router r3 lan3 -b
+router r1 r2 -r
+router r2 r3 -r
+router r3 r1 -r

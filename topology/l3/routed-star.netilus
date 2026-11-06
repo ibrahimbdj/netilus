@@ -1,0 +1,6 @@
+10.0.0
+# One router at the center, each host on its own direct link and subnet
+router r1 h1
+router r1 h2
+router r1 h3
+router r1 h4

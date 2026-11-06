@@ -1,0 +1,9 @@
+10.0.0
+# Two LANs, each behind its own router, routers linked together
+bridge lan1 h1
+bridge lan1 h2
+bridge lan2 h3
+bridge lan2 h4
+router r1 lan1 -b
+router r1 r2 -r
+router r2 lan2 -b
